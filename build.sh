@@ -95,11 +95,18 @@ echo "TARGET_DEVICE: $TARGET_DEVICE"
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled (BakaSU)"
-    # 管理器由 ReSukiSU 切换为 BakaSU（KernelSU 分支），锁定到最新发布 tag v4.1.0 以保证可复现构建。
+    # ReSukiSU 已更名为 BakaSU（同一项目，仓库迁移至 Baka-SU/BakaSU）。
+    # 锁定到固定 commit（2026-10-17 main，kernel driver 35231）以保证构建可复现。
+    # Update BAKASU_COMMIT when bumping BakaSU.
     # 上游 setup.sh 会在 drivers/ 下建立 kernelsu 软链接，并追加 CONFIG_KSU 的 Makefile/Kconfig 条目。
-    # 升级版本时只需替换 BAKASU_COMMIT。
-    BAKASU_COMMIT=v4.1.0
+    BAKASU_COMMIT=2489b38582a08fee7b586d05185da5e5d12c6a5c
     curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash -s "$BAKASU_COMMIT"
+
+    # BakaSU 上游 sucompat 的 SUSFS 版 ksu_handle_faccessat 仍缺少 uid 校验，
+    # 会把任何进程对 /system/bin/su 的 access()/faccessat() 改写成 /system/bin/sh，
+    # 导致检测软件误报 su 存在（详见 patch_sucompat.py）。补丁幂等，锚点失配即失败。
+    echo "Hardening sucompat faccessat path..."
+    python3 patch_sucompat.py KernelSU/kernel/feature/sucompat.c
 else
     echo "KSU is disabled"
 fi
